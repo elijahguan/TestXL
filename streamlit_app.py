@@ -126,16 +126,16 @@ if analyze_clicked:
 if "result" in st.session_state:
     questions = st.session_state["result"].get("questions", [])
 
-    topics: dict[str, list[dict]] = {}
-    for q in questions:
-        topics.setdefault(q.get("topic", "Uncategorized"), []).append(q)
+    topics: dict[str, list[tuple[int, dict]]] = {}
+    for idx, q in enumerate(questions):
+        topics.setdefault(q.get("topic", "Uncategorized"), []).append((idx, q))
 
     st.divider()
     st.subheader(f"{len(questions)} question(s) across {len(topics)} topic(s)")
 
     for topic, qs in topics.items():
         st.markdown(f"### {topic}")
-        for q in qs:
+        for idx, q in qs:
             flag_prefix = "⚠️ " if q.get("flagged") else ""
             preview = (q.get("original_question") or "")[:90]
             with st.expander(f"{flag_prefix}{preview}"):
@@ -145,6 +145,38 @@ if "result" in st.session_state:
                 st.markdown(f"**Explanation:** {q.get('explanation')}")
                 if q.get("flagged"):
                     st.warning(f"Watch out: {q.get('flag_reason')}")
+
                 st.markdown("---")
-                st.markdown(f"**Variant to try:** {q.get('variant_question')}")
-                st.markdown(f"**Variant answer:** {q.get('variant_answer')}")
+
+                show_key = f"show_variant_{idx}"
+                if not st.session_state.get(show_key):
+                    if st.button("🎯 Click this button to try a similar question", key=f"variant_btn_{idx}"):
+                        st.session_state[show_key] = True
+                        st.rerun()
+                else:
+                    choices = q.get("variant_choices", [])
+                    correct_idx = q.get("variant_correct_index")
+
+                    st.markdown(f"**{q.get('variant_question')}**")
+                    selected = st.radio(
+                        "Choose an answer:",
+                        choices,
+                        key=f"variant_choice_{idx}",
+                        index=None,
+                    )
+
+                    if st.button("Submit answer", key=f"submit_variant_{idx}"):
+                        if selected is None:
+                            st.warning("Pick an answer first.")
+                        else:
+                            correct_choice = (
+                                choices[correct_idx]
+                                if correct_idx is not None and correct_idx < len(choices)
+                                else None
+                            )
+                            if selected == correct_choice:
+                                st.success("Correct!")
+                            else:
+                                st.error(f"Not quite — the correct answer was: {correct_choice}")
+                            if q.get("variant_explanation"):
+                                st.markdown(f"**Explanation:** {q.get('variant_explanation')}")
