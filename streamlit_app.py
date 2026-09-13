@@ -67,11 +67,11 @@ def _strip_code_fences(text: str) -> str:
     return cleaned.strip()
 
 
-def analyze_questions(raw_text: str) -> dict:
+def analyze_questions(raw_text: str, language: str) -> dict:
     client = get_client()
     response = client.models.generate_content(
         model=MODEL,
-        contents=ANALYZE_PROMPT.format(raw_text=raw_text),
+        contents=ANALYZE_PROMPT.format(raw_text=raw_text, language=language),
     )
     response_text = response.text
     cleaned = _strip_code_fences(response_text)
@@ -106,6 +106,8 @@ raw_text = st.text_area(
     ),
 )
 
+language = st.selectbox("Answer language", ["English", "Chinese"])
+
 col1, col2 = st.columns([1, 5])
 with col1:
     analyze_clicked = st.button("Analyze", type="primary")
@@ -119,7 +121,7 @@ if analyze_clicked:
         st.warning("Paste in some questions first.")
     else:
         with st.spinner("Analyzing your questions..."):
-            st.session_state["result"] = analyze_questions(raw_text)
+            st.session_state["result"] = analyze_questions(raw_text, language)
 
 if "result" in st.session_state:
     questions = st.session_state["result"].get("questions", [])
