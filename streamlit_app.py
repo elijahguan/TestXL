@@ -11,6 +11,35 @@ st.set_page_config(page_title="TestXL", page_icon="📚", layout="wide")
 MODEL = "gemini-3.5-flash-lite"
 
 
+def check_passcode() -> None:
+    """Gate the app behind a shared passcode. Stops execution until entered correctly."""
+    if st.session_state.get("passcode_ok"):
+        return
+
+    try:
+        correct_passcode = st.secrets["BETAUSERS"]
+    except (KeyError, FileNotFoundError):
+        correct_passcode = os.environ.get("BETAUSERS")
+
+    if not correct_passcode:
+        st.error(
+            "No BETAUSERS passcode configured. Add BETAUSERS to your "
+            "Streamlit Cloud app secrets, or to a local .env file for testing."
+        )
+        st.stop()
+
+    st.title("📚 TestXL")
+    st.caption("Beta access — enter the passcode you were given to continue.")
+    entered = st.text_input("Passcode", type="password")
+    if st.button("Enter"):
+        if entered == correct_passcode:
+            st.session_state["passcode_ok"] = True
+            st.rerun()
+        else:
+            st.error("Incorrect passcode.")
+    st.stop()
+
+
 def get_client() -> genai.Client:
     """Load the API key from Streamlit secrets (cloud) or environment (local)."""
     api_key = None
@@ -56,6 +85,8 @@ def analyze_questions(raw_text: str) -> dict:
 
 
 # --- UI ---
+
+check_passcode()
 
 st.title("📚 TestXL")
 st.caption(
