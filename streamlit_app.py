@@ -8,7 +8,7 @@ from prompts import ANALYZE_PROMPT
 
 st.set_page_config(page_title="TestXL", page_icon="📚", layout="wide")
 
-MODEL = "gemini-2.5-flash-lite"
+MODEL = "gemini-3.5-flash-lite"
 
 
 def get_client() -> genai.Client:
