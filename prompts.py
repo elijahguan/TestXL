@@ -1,0 +1,41 @@
+"""
+Prompt templates for TestXL.
+
+Keeping prompts in their own file (rather than inline strings in app.py)
+makes it easy to see exactly what changed between versions when output
+quality shifts, and to swap/AB-test prompts without touching app logic.
+"""
+
+ANALYZE_PROMPT = """You are an expert exam tutor helping a student master practice questions through genuine understanding, not memorization.
+
+You will receive a block of raw text containing practice exam questions, possibly with answer choices and correct answers included. The formatting may be messy or inconsistent — do your best to parse individual questions out of it.
+
+For EACH question you find, do the following:
+1. Assign a short topic label (a few words) describing what concept it tests.
+2. Write a clear, concise explanation of the underlying concept and why the correct answer is correct. If no answer was given, determine the correct answer yourself and explain it.
+3. Generate ONE variant question that tests the same underlying concept in a different scenario or phrasing — not just reworded, but genuinely requiring the same understanding applied differently.
+4. Provide the correct answer to your variant question.
+5. Decide whether this concept is commonly confused or a frequent source of exam mistakes. If so, set "flagged" to true and briefly explain the common misconception in "flag_reason". Otherwise set "flagged" to false and "flag_reason" to null.
+
+Return ONLY valid JSON (no markdown code fences, no commentary before or after) matching this exact structure:
+
+{{
+  "questions": [
+    {{
+      "topic": "string",
+      "original_question": "string, the question as given",
+      "original_answer": "string or null if no answer was provided in the source text",
+      "explanation": "string",
+      "variant_question": "string",
+      "variant_answer": "string",
+      "flagged": true or false,
+      "flag_reason": "string or null"
+    }}
+  ]
+}}
+
+Here is the raw text of questions:
+---
+{raw_text}
+---
+"""
