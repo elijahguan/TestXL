@@ -1,5 +1,7 @@
+import csv
 import json
 import os
+from datetime import datetime, timezone
 
 import streamlit as st
 from google import genai
@@ -9,6 +11,8 @@ from prompts import ANALYZE_PROMPT
 st.set_page_config(page_title="TestXL", page_icon="📚", layout="wide")
 
 MODEL = "gemini-3.5-flash-lite"
+USAGE_LOG_PATH = "usage_log.csv"
+FEEDBACK_LOG_PATH = "feedback_log.csv"
 
 
 def check_passcode() -> None:
@@ -57,6 +61,44 @@ def get_client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
+def _append_csv_row(path: str, header: list[str], row: list) -> None:
+    """Append a row to a local CSV, writing the header first if the file is new.
+    Best-effort — logging must never break the app if it fails."""
+    try:
+        file_exists = os.path.exists(path)
+        with open(path, "a", newline="") as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(header)
+            writer.writerow(row)
+    except Exception:
+        pass
+
+
+def log_usage(response, language: str) -> None:
+    usage = getattr(response, "usage_metadata", None)
+    _append_csv_row(
+        USAGE_LOG_PATH,
+        ["timestamp_utc", "model", "language", "prompt_tokens", "output_tokens", "total_tokens"],
+        [
+            datetime.now(timezone.utc).isoformat(),
+            MODEL,
+            language,
+            getattr(usage, "prompt_token_count", None) if usage else None,
+            getattr(usage, "candidates_token_count", None) if usage else None,
+            getattr(usage, "total_token_count", None) if usage else None,
+        ],
+    )
+
+
+def log_feedback(question_preview: str, topic: str, rating: str, comment: str) -> None:
+    _append_csv_row(
+        FEEDBACK_LOG_PATH,
+        ["timestamp_utc", "topic", "question_preview", "rating", "comment"],
+        [datetime.now(timezone.utc).isoformat(), topic, question_preview, rating, comment],
+    )
+
+
 def _strip_code_fences(text: str) -> str:
     cleaned = text.strip()
     if cleaned.startswith("```"):
@@ -69,10 +111,25 @@ def _strip_code_fences(text: str) -> str:
 
 def analyze_questions(raw_text: str, language: str) -> dict:
     client = get_client()
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=ANALYZE_PROMPT.format(raw_text=raw_text, language=language),
-    )
+
+    try:
+        response = client.models.generate_content(
+            model=MODEL,
+            contents=ANALYZE_PROMPT.format(raw_text=raw_text, language=language),
+        )
+    except Exception as e:
+        error_text = str(e).lower()
+        if "429" in error_text or "rate limit" in error_text or "quota" in error_text or "resource_exhausted" in error_text:
+            st.error(
+                "We've hit the free-tier rate limit for the moment. "
+                "Wait a minute or two and try again."
+            )
+        else:
+            st.error(f"Something went wrong talking to the AI: {e}")
+        st.stop()
+
+    log_usage(response, language)
+
     response_text = response.text
     cleaned = _strip_code_fences(response_text)
 
@@ -180,3 +237,26 @@ if "result" in st.session_state:
                                 st.error(f"Not quite — the correct answer was: {correct_choice}")
                             if q.get("variant_explanation"):
                                 st.markdown(f"**Explanation:** {q.get('variant_explanation')}")
+
+                st.markdown("---")
+
+                feedback_key = f"feedback_given_{idx}"
+                if not st.session_state.get(feedback_key):
+                    st.markdown("**Was this question helpful?**")
+                    fcol1, fcol2 = st.columns([1, 1])
+                    with fcol1:
+                        thumbs_up = st.button("👍 Helpful", key=f"thumbs_up_{idx}")
+                    with fcol2:
+                        thumbs_down = st.button("👎 Not helpful", key=f"thumbs_down_{idx}")
+                    comment = st.text_input(
+                        "Optional comment:", key=f"comment_{idx}", label_visibility="collapsed",
+                        placeholder="Optional comment...",
+                    )
+                    if thumbs_up or thumbs_down:
+                        log_feedback(
+                            preview, topic, "up" if thumbs_up else "down", comment,
+                        )
+                        st.session_state[feedback_key] = True
+                        st.rerun()
+                else:
+                    st.caption("Thanks for the feedback! 🙏")
