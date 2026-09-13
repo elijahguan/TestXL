@@ -10,6 +10,8 @@ ANALYZE_PROMPT = """You are an expert exam tutor helping a student master practi
 
 You will receive a block of raw text containing practice exam questions, possibly with answer choices and correct answers included. The formatting may be messy or inconsistent — do your best to parse individual questions out of it.
 
+Write your entire response in {language}. Every text field below (topic, explanation, questions, answers, flag_reason) must be written in {language}, even if the source questions were given in a different language. Keep technical terms, proper nouns, and acronyms (e.g. protocol names, exam terminology) accurate rather than force-translating them if a direct translation would be confusing or nonstandard.
+
 For EACH question you find, do the following:
 1. Assign a short topic label (a few words) describing what concept it tests.
 2. Write a clear, concise explanation of the underlying concept and why the correct answer is correct. If no answer was given, determine the correct answer yourself and explain it.
